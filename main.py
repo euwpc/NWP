@@ -54,12 +54,10 @@ except ImportError:
 
 warnings.filterwarnings("ignore")
 
-# ── Configuration ─────────────────────────────────────────────────────────────
 
 UPDATE_INTERVAL = 300        # seconds between auto-refreshes
 DPI             = 200
 
-# Netherlands bounding box  [lon_min, lon_max, lat_min, lat_max]
 EXTENT = [3.2, 7.3, 50.7, 53.7]
 
 GRID_STEP = 0.01             # degrees (~1 km)
@@ -79,7 +77,6 @@ ANON_API_KEY = (
     "I0MjlkODQ2MThiNWI4ZDViZDAyMTM2YTM3IiwiaCI6Im11cm11cjEyOCJ9"
 )
 
-# ── Colour maps ───────────────────────────────────────────────────────────────
 
 def parse_qml(filename, vmin, vmax):
     path = os.path.join(SCRIPT_DIR, filename)
@@ -131,7 +128,6 @@ def load_cmaps():
     return c
 
 
-# ── KNMI data fetch ───────────────────────────────────────────────────────────
 
 def _dewpoint(t, rh):
     if np.isnan(t) or np.isnan(rh) or rh <= 0:
@@ -144,7 +140,6 @@ def _dewpoint(t, rh):
 def _get_latest_nc_url(api_key: str) -> tuple[str, str]:
     """Return (temporary_download_url, filename) for the latest 10-min file."""
     headers = {"Authorization": api_key}
-    # List the most-recently-modified file
     list_url = (
         f"{KNMI_API_BASE}/datasets/{DATASET_NAME}"
         f"/versions/{DATASET_VERSION}/files"
@@ -161,7 +156,6 @@ def _get_latest_nc_url(api_key: str) -> tuple[str, str]:
         raise RuntimeError(f"KNMI list error: {data['error']}")
     filename = data["files"][0]["filename"]
 
-    # Get signed download URL
     url_resp = requests.get(
         f"{list_url}/{filename}/url",
         headers=headers,
@@ -174,7 +168,6 @@ def _get_latest_nc_url(api_key: str) -> tuple[str, str]:
 
 def _read_nc_stations(nc_bytes: bytes) -> tuple[list[dict], str]:
     """Parse a KNMI 10-min NetCDF file into a list of station dicts."""
-    # Write to a temp file because netCDF4 needs a real path
     with tempfile.NamedTemporaryFile(suffix=".nc", delete=False) as tmp:
         tmp.write(nc_bytes)
         tmp_path = tmp.name
@@ -200,7 +193,6 @@ def _read_nc_stations(nc_bytes: bytes) -> tuple[list[dict], str]:
         except Exception:
             station_names = [f"S{i}" for i in range(len(lats))]
 
-        # Variable mapping: NetCDF name → our key
         var_map = {
             "ta":  "temp",    # Ambient Temperature 1.5m
             "ff":  "wind",    # Wind Speed 10m average
@@ -216,7 +208,7 @@ def _read_nc_stations(nc_bytes: bytes) -> tuple[list[dict], str]:
         for nc_var, key in var_map.items():
             arrays[key] = _arr(nc_var)
 
-        # Timestamp
+        
         try:
             time_var = ds.variables["time"]
             t_val = nc.num2date(time_var[:][0], units=time_var.units)
@@ -241,7 +233,6 @@ def _read_nc_stations(nc_bytes: bytes) -> tuple[list[dict], str]:
 
             t  = _v("temp")
             rh = _v("hum")
-            # Prefer stored dewpoint, fall back to computed
             dp = _v("dewp")
             if np.isnan(dp):
                 dp = _dewpoint(t, rh)
@@ -279,7 +270,6 @@ def fetch(api_key: str) -> tuple[list[dict], str]:
     return stations, time_str
 
 
-# ── Grid & interpolation ──────────────────────────────────────────────────────
 
 def make_grid():
     lons = np.arange(EXTENT[0], EXTENT[1] + GRID_STEP, GRID_STEP)
@@ -299,7 +289,6 @@ def interpolate(stations, key, gx, gy):
     return gaussian_filter(zi, sigma=SIGMA)
 
 
-# ── Shapefile cache ───────────────────────────────────────────────────────────
 
 _SHPCACHE = {}
 
@@ -325,7 +314,6 @@ def _get_country_geoms(iso_keep_tuple):
     return keep_union, other_union
 
 
-# ── Rendering ─────────────────────────────────────────────────────────────────
 
 _PE  = [mpe.withStroke(linewidth=3, foreground="white")]
 _PE2 = [mpe.withStroke(linewidth=4, foreground="white")]
@@ -462,7 +450,6 @@ def render_one(stations, key, cmap, norm, title, unit, fmt,
     print(f"  Saved  {os.path.basename(outfile)}")
 
 
-# ── Panel definitions ─────────────────────────────────────────────────────────
 
 PANELS = [
     # (key,  title,                               unit,  fmt,      arrows, isobars, filename)
@@ -476,7 +463,6 @@ PANELS = [
 ]
 
 
-# ── Main loop ─────────────────────────────────────────────────────────────────
 
 def run_once(api_key, cmaps, gx, gy):
     try:
@@ -506,7 +492,6 @@ def loop(api_key, cmaps, gx, gy):
         time.sleep(UPDATE_INTERVAL)
 
 
-# ── Entry point ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     print()
@@ -541,4 +526,5 @@ if __name__ == "__main__":
         while True:
             time.sleep(5)
     except KeyboardInterrupt:
+
         print("\nStopped.")
